@@ -1,0 +1,91 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Models and weights (can be large)
+models/
+*.h5
+*.tflite
+*.keras
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_metadata/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Environment and config
+config.json
+credentials.json
+secrets.yaml
+*.key
+*.pem
+
+# ESP32/Arduino
+*.pio
+.clang_complete
+.gcc-flags.json
+.ccls
+.ccls-cache/
+
+# Audio files (may be large or contain sensitive samples)
+audio_samples/*.wav
+audio_samples/*.mp3
+training_data/*.wav
+training_data/*.mp3
+# But keep placeholder files
+!audio_samples/.gitkeep
+!training_data/.gitkeep
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Distribution / packaging
+*.tar.gz
+*.zip
+*.rar
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db 
+
+# Others
+old_files
