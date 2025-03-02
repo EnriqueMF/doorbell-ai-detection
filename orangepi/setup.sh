@@ -6,6 +6,8 @@
 # IMPORTANT: Configure the variables before running the script
 #
 
+# TODO(#1): Implement loading of environment variables from .env file
+
 set -e  # Exit on error
 
 # Text colors

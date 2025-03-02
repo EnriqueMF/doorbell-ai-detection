@@ -159,7 +159,7 @@ def send_notification(message=None, topic=None):
     
     Args:
         message: Message to send (default: "Doorbell detected!")
-        topic: Topic to publish to (default: from env or 'alarma/detector')
+        topic: Topic to publish to (default: from env or 'home/doorbell/detect')
     
     Returns:
         bool: True if successful, False otherwise
