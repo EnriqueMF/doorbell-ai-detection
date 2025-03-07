@@ -19,29 +19,87 @@ This project implements a smart doorbell system using an ESP8266 microcontroller
 - Power supply
 - Optional: Doorbell button
 
-## Prerequisites
+## Software Dependencies
 
-### Required MQTT Server Setup
+### Required Libraries
 
-**IMPORTANT**: This system REQUIRES a running MQTT broker to function. The MQTT broker is the central communication hub that enables the doorbell detection system to work. You have several options:
+- **ESP8266WiFi**: Built-in library for WiFi connectivity
+- **PubSubClient** (>=2.8.0): For MQTT communication
+- **CTBot** (>=2.1.9): For Telegram bot functionality
+- **ArduinoJson** (6.19.4): For JSON parsing (IMPORTANT: Use version 6.19.4, newer versions may have compatibility issues)
+- **DFRobotDFPlayerMini** (>=1.0.5): For MP3 player control
+- **SoftwareSerial**: Built-in library for serial communication with DFPlayer
 
-1. **VPS Server**:
-   - Set up a VPS with your preferred provider (DigitalOcean, AWS, etc.)
-   - Install and configure Mosquitto MQTT broker
-   - Ensure the server is accessible from your network
-   - Configure proper security (firewall rules, authentication)
+### Arduino IDE Setup
 
-2. **Local Server**:
-   - Set up Mosquitto on a local machine (Raspberry Pi, desktop computer)
-   - Must be always running and accessible on your network
-   - Configure port forwarding if remote access is needed
+1. Add ESP8266 board support:
+   - Open Arduino IDE → Preferences
+   - Add URL to Additional Boards Manager URLs:
+     ```
+     http://arduino.esp8266.com/stable/package_esp8266com_index.json
+     ```
+   - Tools → Board → Boards Manager
+   - Search for "esp8266" and install
 
-3. **Public MQTT Broker** (Not recommended for production):
-   - Only use for testing
-   - No guaranteed uptime or security
-   - Limited functionality
+2. Board Configuration:
+   - Board: "NodeMCU 1.0 (ESP-12E Module)"
+   - CPU Frequency: "80 MHz"
+   - Flash Size: "4MB (FS:2MB OTA:~1019KB)"
+   - Upload Speed: "115200"
 
-For detailed MQTT server setup instructions, refer to the [VPS MQTT Server Configuration Guide](../vps/README.md).
+## MQTT Server Setup (REQUIRED)
+
+The MQTT broker is **ESSENTIAL** for the system to function. You have several options:
+
+### 1. VPS Server (Recommended)
+- Set up a VPS with your preferred provider
+- Install Mosquitto MQTT broker:
+  ```bash
+  sudo apt update
+  sudo apt install mosquitto mosquitto-clients
+  sudo systemctl enable mosquitto
+  ```
+- Configure authentication:
+  ```bash
+  sudo mosquitto_passwd -c /etc/mosquitto/passwd your_username
+  ```
+- Edit `/etc/mosquitto/conf.d/default.conf`:
+  ```
+  listener 1883
+  password_file /etc/mosquitto/passwd
+  allow_anonymous false
+  ```
+- Restart Mosquitto:
+  ```bash
+  sudo systemctl restart mosquitto
+  ```
+
+### 2. Local Server
+- Install Mosquitto on a local machine:
+  ```bash
+  sudo apt install mosquitto mosquitto-clients
+  ```
+- Follow same configuration steps as VPS
+- Configure port forwarding if needed
+- Ensure the server is always running
+
+### 3. Public MQTT Broker (Testing Only)
+- Only use for development/testing
+- No guaranteed uptime or security
+- Examples:
+  - test.mosquitto.org
+  - broker.hivemq.com
+  - iot.eclipse.org
+
+### Testing MQTT Connection
+
+```bash
+# Subscribe to test topic
+mosquitto_sub -h [broker-address] -p 1883 -u [username] -P [password] -t "test/#"
+
+# Publish test message
+mosquitto_pub -h [broker-address] -p 1883 -u [username] -P [password] -t test -m "test"
+```
 
 ## Wiring
 
@@ -55,17 +113,6 @@ For detailed MQTT server setup instructions, refer to the [VPS MQTT Server Confi
 - **LED Indicator** (optional):
   - Anode → GPIO1 through a resistor
   - Cathode → GND
-
-## Software Dependencies
-
-- Arduino IDE
-- Libraries:
-  - ESP8266WiFi
-  - SoftwareSerial
-  - DFRobotDFPlayerMini
-  - CTBot (for Telegram)
-  - ArduinoJson (version 6.19.4 or earlier)
-  - PubSubClient (for MQTT)
 
 ## Setup Instructions
 
