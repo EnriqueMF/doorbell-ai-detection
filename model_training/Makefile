@@ -1,58 +1,56 @@
-# Makefile for doorbell detection model training
-# Uses conda for environment management
+# Makefile for doorbell detection model training (Linux only)
 
-.PHONY: help setup-conda install-deps clean run-jupyter install-all-conda
+# Unix commands
+RM_CMD = rm -rf __pycache__
+RM_IPYNB_CMD = rm -rf .ipynb_checkpoints
+MKDIR_CMD = mkdir -p $(1)
+PYTHON_CMD = python3
+JUPYTER_CMD = jupyter
 
-# Variables
-PYTHON_VERSION = 3.8
-PIP_PACKAGES = jupyter notebook matplotlib gdown
-CONDA_PACKAGES = numpy tensorflow scikit-learn librosa soundfile
+# Get Python version for venv package
+PYTHON_VERSION := $(shell $(PYTHON_CMD) --version | cut -d' ' -f2 | cut -d'.' -f1,2)
+PYTHON_VENV_PKG = python$(PYTHON_VERSION)-venv
 
-help:
-	@echo "Available commands:"
-	@echo "  make help             - Show this help"
-	@echo "  make setup-conda      - Set up conda environment"
-	@echo "  make install-deps     - Install dependencies in active environment"
-	@echo "  make install-all-conda  - Set up everything with conda (recommended)"
-	@echo "  make clean            - Remove temporary files and caches"
-	@echo "  make run-jupyter      - Start Jupyter notebook server"
-	@echo "  make download-audio   - Download audio files from Google Drive"
+# Unix venv commands
+VENV_ACTIVATE = source venv/bin/activate
+PIP_CMD = ./venv/bin/pip
+VENV_JUPYTER = ./venv/bin/jupyter
 
-# Setup with conda
-setup-conda:
-	@echo "Setting up conda environment..."
-	conda create -y -n doorbell_detector python=$(PYTHON_VERSION)
-	@echo "Activate the environment with: conda activate doorbell_detector"
+# Targets
+.PHONY: all setup install test clean venv run
 
-# Install dependencies
-install-deps:
-	@echo "Installing dependencies..."
-	pip install $(PIP_PACKAGES)
-	conda install -y $(CONDA_PACKAGES)
+# Default target
+all: setup
 
-# Complete installation with conda (recommended)
-install-all-conda: setup-conda
-	@echo "Installing all dependencies with conda..."
-	conda install -y -n doorbell_detector -c conda-forge $(CONDA_PACKAGES)
-	conda run -n doorbell_detector pip install $(PIP_PACKAGES)
-	@echo "\nEnvironment successfully configured!"
-	@echo "To activate the environment: conda activate doorbell_detector"
-	@echo "To run Jupyter: make run-jupyter"
+# Setup
+setup: system-deps venv
+	$(PIP_CMD) install -r requirements.txt
 
-# Cleanup
+# Install system dependencies
+system-deps:
+	sudo apt-get update
+	sudo apt-get install -y python3-dev libasound2-dev libsndfile1-dev $(PYTHON_VENV_PKG)
+	@echo "System dependencies installed successfully."
+
+# Create virtual environment
+venv: system-deps
+	$(PYTHON_CMD) -m venv venv
+	@echo "Virtual environment created. Activate with: $(VENV_ACTIVATE)"
+
+# Install Python dependencies only
+install:
+	$(PIP_CMD) install -r requirements.txt
+
+# Test the environment
+test:
+	$(PYTHON_CMD) -c "import librosa, tensorflow; print('Environment configured correctly')"
+
+# Clean temporary files
 clean:
-	@echo "Cleaning temporary files..."
-	rm -rf __pycache__
-	rm -rf .ipynb_checkpoints
-	find . -name "*.pyc" -delete
+	$(RM_CMD)
+	$(RM_IPYNB_CMD)
+	find . -type f -name "*.pyc" -delete
 
-# Run Jupyter
-run-jupyter:
-	@echo "Starting Jupyter Notebook..."
-	jupyter notebook ../model_training/doorbell_detection_training.ipynb
-
-# Instructions for downloading files
-download-audio:
-	@echo "Downloading audio files..."
-	mkdir -p ../audio_samples
-	python -c "import gdown; gdown.download_folder('https://drive.google.com/drive/folders/1U7N5TEEiXGxcgeGYuU2cLPp3nGQB0fGQ', output='../audio_samples', quiet=False, use_cookies=False)" 
+# Run the Jupyter notebook
+run:
+	$(VENV_JUPYTER) notebook doorbell_detection_training.ipynb
