@@ -87,5 +87,38 @@ training_data/*.mp3
 ehthumbs.db
 Thumbs.db 
 
+# Arduino component
+
+# Ignore configuration file with sensitive credentials
+config.h
+
+# Ignore compiled binaries and build files
+*.bin
+*.elf
+*.hex
+*.o
+*.a
+*.d
+
+# Ignore Arduino build directory
+build/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo 
+
 # Others
 old_files
+
+# Ignore audio samples
+audio_samples/
+
+# Model training files
+model_training/venv/
+model_training/doorbell_detection_utils_es.py

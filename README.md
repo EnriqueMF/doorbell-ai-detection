@@ -255,7 +255,7 @@ spectral_contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_bands=6)
 
 ### Data Augmentation Techniques
 
-To achieve robust doorbell detection in real-world conditions, we implement data augmentation strategies during model training. These techniques modify the original doorbell audio to create a diverse training dataset that simulates various environmental conditions:
+To achieve robust doorbell detection in real-world conditions, the system implements data augmentation strategies during model training. These techniques modify the original doorbell audio to create a diverse training dataset that simulates various environmental conditions:
 
 #### 1. Pitch Shifting
 
@@ -290,7 +290,7 @@ To achieve robust doorbell detection in real-world conditions, we implement data
 
 #### 5. Advanced Noise Types (Extended Augmentation)
 
-Our enhanced augmentation pipeline includes:
+The enhanced augmentation pipeline includes:
 
 - **White noise**: Random noise across all frequencies
 - **Pink noise**: Noise with higher energy in lower frequencies (common in household environments)
@@ -298,19 +298,119 @@ Our enhanced augmentation pipeline includes:
 
 #### 6. Combined Transformations
 
-For maximum robustness, we also apply combinations of these techniques:
+For maximum robustness, combinations of these techniques are also applied:
 
 - Pitch shifting + noise addition
 - Volume variation + time stretching
 - Multiple augmentations per original sample
 
-These data augmentation techniques significantly increase the diversity of our training dataset, allowing the model to generalize better to unseen doorbell sounds and environmental conditions. In our testing, models trained with these augmentation techniques show a 37% improvement in detection accuracy in challenging conditions compared to models trained on unaugmented data.
+These data augmentation techniques significantly increase the diversity of the training dataset, allowing the model to generalize better to unseen doorbell sounds and environmental conditions. In testing, models trained with these augmentation techniques show a 37% improvement in detection accuracy in challenging conditions compared to models trained on unaugmented data.
 
-### Advantages of Our Approach
+### Dataset Imbalance
 
-Our multi-feature approach significantly outperforms simple frequency analysis methods:
+This project addresses a common challenge in acoustic event detection: the extreme imbalance between positive samples (doorbell sounds) and negative samples (background noise). This is particularly pronounced when only a single doorbell recording is available for training.
 
-| Aspect | Simple FFT Analysis | Our Multi-Feature Approach |
+#### The Class Imbalance Problem
+
+In real-world detection scenarios, doorbell events are rare compared to background noise, creating a natural class imbalance that can lead to several issues.
+
+This extreme imbalance presents several challenges:
+- Models tend to predict the majority class (background) by default
+- Standard accuracy metrics become misleading
+- The model fails to learn the distinguishing features of doorbell sounds
+
+#### The Solution: Multi-faceted Balancing Strategy
+
+The imbalance is addressed through a comprehensive approach:
+
+1. **Data Augmentation**: As detailed above, various transformations are applied to the limited positive samples to increase their representation in the training set. This is particularly important when only one doorbell recording is available.
+
+2. **Class Weighting**: Class weights are applied inversely proportional to their frequency, giving doorbell samples significantly higher importance during training.
+
+3. **Undersampling**: For extremely imbalanced cases, the number of background samples is selectively reduced to achieve a more manageable ratio (typically around 10:1).
+
+4. **Validation Strategy**: Stratified sampling is used to maintain the class distribution in validation sets, ensuring reliable model evaluation.
+
+#### Advanced Background Mixing Techniques
+
+The system implements an innovative technique to further enhance the diversity of positive examples.
+
+This approach mixes doorbell sounds (both original and augmented) with random background noise segments using a random mixing ratio. The process:
+
+1. **Selects random background segments** from the negative examples
+2. **Combines them with doorbell segments** using a controlled mixing ratio (typically 0.1-0.5)
+3. **Creates realistic "doorbell-in-noise" scenarios** that train the model to detect doorbells in various acoustic environments
+
+The mixing implementation provides several advantages:
+
+- **Controlled dataset balance**: Exact positive-to-negative ratios can be specified
+- **Expanded positive examples**: Instead of 10-20 positive examples, hundreds or thousands can be generated
+- **Realistic simulation**: The mixed samples represent real-world conditions where doorbells occur with background noise
+- **Difficulty tuning**: By adjusting the mixing ratio, easier or harder examples can be created for the model
+
+The implementation includes detailed statistics tracking:
+
+```
+Dataset statistics:
+  - Original doorbell segments: 8
+  - Augmented doorbell segments: 40
+  - Mixed doorbell with background: 40
+  - Total positive examples: 80
+  - Negative examples: 400
+  - Positive:Negative ratio: 1:5.0
+```
+
+This transparent reporting helps fine-tune the balancing parameters for optimal model performance.
+
+#### Enhanced Dataset Processing
+
+Several key improvements have been implemented in the dataset processing pipeline:
+
+1. **Modular Code Architecture**:
+   - Dedicated functions for common tasks like `get_segments()` and `apply_augmentations()`
+   - Clear separation of concerns improves maintainability and readability
+   - Type annotations enhance code documentation and IDE support
+
+2. **Configurable Augmentation Parameters**:
+   ```python
+   aug_config = {
+       "pitch_min": -1, "pitch_max": 1,
+       "stretch_min": 0.8, "stretch_max": 1.2,
+       "noise_min": 0.01, "noise_max": 0.1,
+       "volume_min": 0.5, "volume_max": 1.5
+   }
+   ```
+   - Centralized configuration allows rapid experimentation
+   - Easy fine-tuning of augmentation intensity
+
+3. **Background Segment Separation**:
+   - Prevents the same audio segments from appearing as both negative examples and within mixed positives
+   - Reduces potential model bias and improves generalization
+   - Controlled by `background_mix_split` parameter (typically 0.5)
+
+4. **Efficient Mixed Example Generation**:
+   - Dedicated `generate_mixed_examples()` function creates realistic doorbell-in-noise scenarios
+   - Random selection from pre-processed segments improves processing speed
+   - Automatic normalization prevents audio clipping
+
+These improvements result in a more robust, flexible, and maintainable data processing pipeline that generates higher-quality training datasets with balanced class distribution.
+
+#### Important Considerations
+
+- **Augmentation Quality vs. Quantity**: While generating numerous variations of a single doorbell sample is useful, transformations are kept subtle and realistic to avoid overfitting.
+
+- **Transformation Constraints**: Augmentation parameters are carefully calibrated to ensure the essential acoustic signatures of the doorbell remain intact.
+
+- **Performance Metrics**: Due to class imbalance, the focus is on precision, recall, and F1-score rather than raw accuracy for model evaluation.
+
+This balanced training approach enables the model to achieve high detection rates in real-world conditions, even when trained with very limited positive samples.
+
+
+### Advantages of This Approach
+
+This multi-feature approach significantly outperforms simple frequency analysis methods:
+
+| Aspect | Simple FFT Analysis | This Multi-Feature Approach |
 |---------|---------------------|-------------------------------|
 | Noise robustness | Low | High |
 | False positives | Frequent | Greatly reduced (<1%) |
