@@ -207,7 +207,7 @@ The EM-200 doorbell produces a distinctive sound pattern with unique frequency c
 
 This temporal pattern can be clearly observed in the following graph:
 
-![Power Variation Over Time](docs/images/variación_potencia.png)
+![Power Variation Over Time](docs/images/variacion_potencia.png)
 
 ### Feature Extraction Approach
 
@@ -226,10 +226,6 @@ mel_spec = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=40, n_fft=1024, hop
 
 #### 2. MFCC Coefficients (n_mfcc=20)
 
-```python
-mfcc = librosa.feature.mfcc(S=librosa.power_to_db(mel_spec), n_mfcc=20)
-```
-
 **Why n_mfcc=20?**
 - The first 13 coefficients capture the general shape of the spectrum
 - Coefficients 14-20 capture the fine details needed to identify the characteristic oscillations between 1.4 and 1.6 kHz
@@ -243,10 +239,6 @@ mfcc = librosa.feature.mfcc(S=librosa.power_to_db(mel_spec), n_mfcc=20)
 - The 50% overlap (hop_length=512) allows for accurate tracking of the 130ms/70ms temporal pattern
 
 #### 4. Spectral Contrast (n_bands=6)
-
-```python
-spectral_contrast = librosa.feature.spectral_contrast(y=y, sr=sr, n_bands=6)
-```
 
 **Why n_bands=6?**
 - Allows analysis of the difference between peaks and valleys across the spectrum
@@ -266,7 +258,6 @@ To achieve robust doorbell detection in real-world conditions, the system implem
 
 #### 2. Time Stretching
 
-
 **Benefits:**
 - Simulates variations in doorbell activation speed
 - Adapts to differences in temporal patterns across doorbell models
@@ -281,7 +272,6 @@ To achieve robust doorbell detection in real-world conditions, the system implem
 - Improves generalization across various installation environments
 
 #### 4. Noise Injection
-
 
 **Benefits:**
 - Simulates real-world environments with background noise

@@ -4,6 +4,49 @@
 
 This directory contains the doorbell-ai components that run on the Orange Pi Zero3, which serves as the main audio processing and detection unit in the doorbell detection system. The Orange Pi captures audio in bucle from a connected microphone, processes it using a trained machine learning model, and sends notifications via MQTT when a doorbell sound is detected.
 
+## Prerequisites
+
+### Required MQTT Server Setup
+
+**IMPORTANT**: A running MQTT broker is REQUIRED for this system to function. The MQTT broker acts as the central communication hub between the Orange Pi (detection unit) and the ESP8266 (notification unit). Without a properly configured MQTT server, the system will not work.
+
+You have several options for setting up an MQTT broker:
+
+1. **VPS Server** (Recommended):
+   - Set up a VPS with your preferred provider (DigitalOcean, AWS, etc.)
+   - Install and configure Mosquitto MQTT broker
+   - Ensure the server is accessible from your network
+   - Configure proper security (firewall rules, authentication)
+
+2. **Local Server**:
+   - Set up Mosquitto on a local machine (Raspberry Pi, desktop computer)
+   - Must be always running and accessible on your network
+   - Configure port forwarding if remote access is needed
+
+3. **Public MQTT Broker** (Not recommended for production):
+   - Only use for testing
+   - No guaranteed uptime or security
+   - Limited functionality
+
+For detailed MQTT server setup instructions, refer to the [VPS MQTT Server Configuration Guide](../vps/README.md).
+
+### Quick MQTT Server Test
+
+Before proceeding with the installation, verify your MQTT broker is accessible:
+
+```bash
+# Install Mosquitto clients
+sudo apt install mosquitto-clients
+
+# Test subscribing to messages
+mosquitto_sub -h [broker-address] -p 1883 -u [username] -P [password] -t "test/#" &
+
+# Test publishing a message (in a new terminal)
+mosquitto_pub -h [broker-address] -p 1883 -u [username] -P [password] -t "test" -m "test message"
+```
+
+If both commands work and you see the test message, your MQTT broker is properly configured.
+
 ## Hardware Requirements
 
 - Orange Pi Zero3 (recommended 2GB+ RAM model)
@@ -116,12 +159,12 @@ If you prefer to install components manually, follow these steps:
 The system uses a `.env` file to store configuration values. These values are initially set in the `setup.sh` script and then saved to `/opt/doorbell_detector/.env`. Here's an explanation of the main configuration parameters:
 
 ```
-# MQTT Configuration
-MQTT_BROKER=mqtt.example.com    # IP address of the MQTT broker
-MQTT_PORT=1883                  # Port of the MQTT broker
-MQTT_USERNAME=username          # Authentication username
-MQTT_PASSWORD=password          # Authentication password
-MQTT_TOPIC=home/doorbell/detect # Topic to publish detection events
+# MQTT Configuration (REQUIRED)
+MQTT_BROKER=mqtt.example.com    # IP address/hostname of your MQTT broker
+MQTT_PORT=1883                  # Port of your MQTT broker (default: 1883)
+MQTT_USERNAME=username          # Your MQTT authentication username
+MQTT_PASSWORD=password          # Your MQTT authentication password
+MQTT_TOPIC=home/doorbell/detect # Topic for publishing detection events
 
 # Audio Configuration
 AUDIO_DEVICE_INDEX=2            # Index of the audio input device
@@ -132,7 +175,10 @@ DETECTION_THRESHOLD=0.5         # Probability threshold for positive detection
 MODEL_PATH=/opt/doorbell_detector/models/doorbell_model.h5
 ```
 
-**Important Note:** For security reasons, always ensure that `.env` files are not committed to your repository. The project includes a `.env.example` file that can be used as a template, but you should configure the actual variables in the `setup.sh` script before running it.
+**Important Notes:** 
+1. For security reasons, always ensure that `.env` files are not committed to your repository.
+2. The MQTT configuration is REQUIRED for the system to function. Make sure you have a running MQTT broker before proceeding with the installation.
+3. The project includes a `.env.example` file that can be used as a template, but you should configure the actual variables in the `setup.sh` script before running it.
 
 To find the correct audio device index, you can run:
 ```bash
@@ -287,4 +333,46 @@ To adjust the detection sensitivity:
 
 ## License
 
-This component is released under the MIT License. See the LICENSE file in the main project directory for more information. 
+This component is released under the MIT License. See the LICENSE file in the main project directory for more information.
+
+### MQTT Connection Issues (Critical)
+
+If you're experiencing MQTT connection problems:
+
+1. **Verify MQTT Broker Status**:
+   ```bash
+   # For local broker:
+   sudo systemctl status mosquitto
+   
+   # Check broker logs:
+   sudo tail -f /var/log/mosquitto/mosquitto.log
+   ```
+
+2. **Test MQTT Connectivity**:
+   ```bash
+   # Test connection
+   mosquitto_sub -h [broker] -p 1883 -u [username] -P [password] -t "test/#"
+   
+   # In another terminal:
+   mosquitto_pub -h [broker] -p 1883 -u [username] -P [password] -t "test" -m "test"
+   ```
+
+3. **Network Connectivity**:
+   - Check if the broker is accessible from your network:
+     ```bash
+     ping [broker-address]
+     telnet [broker-address] 1883
+     ```
+   - Verify firewall rules allow MQTT traffic (port 1883 by default)
+   - Check if DNS resolution works (if using hostname)
+
+4. **Authentication Issues**:
+   - Verify credentials in `.env` match those configured in the broker
+   - Check broker's ACL (Access Control List) configuration
+   - Try connecting with different credentials to isolate the issue
+
+5. **Monitor MQTT Traffic**:
+   ```bash
+   # Subscribe to all topics (useful for debugging)
+   mosquitto_sub -h [broker] -p 1883 -u [username] -P [password] -t "#" -v
+   ``` 
