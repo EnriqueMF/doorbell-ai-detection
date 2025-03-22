@@ -22,23 +22,41 @@ PubSubClient client(espClient);
 unsigned long lastMsgTime = 0;
 const unsigned long twoHours = 7200000; // 2 hours in milliseconds
 
+bool is_subscribed = false;
+
 // Test MQTT broker connectivity using Pinger
 bool pingBroker() {
   IPAddress brokerIP;
   if(!brokerIP.fromString(mqtt_server)) {
-    Serial.println("Error: Invalid broker IP");
+    Serial.println("Error: IP del broker no válida");
     return false;
   }
-  return pinger.Ping(brokerIP);
+  Serial.print("Haciendo ping al broker (");
+  Serial.print(brokerIP);
+  Serial.println(")...");
+  if(pinger.Ping(brokerIP) == false) {
+    Serial.println("Ping fallido.");
+    return false;
+  }
+  Serial.println("Ping exitoso.");
+  return true;
 }
 
 // MQTT reconnection and status publishing
 void reconnect() {
   while (!client.connected()) {
-    if (client.connect(mqtt_client_id, mqtt_user, mqtt_password)) {
-      client.subscribe(mqtt_topic);
-      client.publish(mqtt_status_topic, "ESP connected successfully");
+    Serial.print("Intentando conexión MQTT...");
+    if (client.connect("timbre_tema_id", mqtt_user, mqtt_password)) {
+      Serial.println("Conectado a MQTT");
+      if (is_subscribed == false) {
+        client.subscribe("alarma/detector");
+        is_subscribed = true;
+      }
+      client.publish("esp/status", "ESP conectado correctamente");
     } else {
+      Serial.print("Fallo en conexión MQTT. Estado=");
+      Serial.print(client.state());
+      Serial.println(" Intentando de nuevo en 5 segundos");
       delay(5000);
     }
   }
@@ -50,10 +68,18 @@ void callback(char* topic, byte* payload, unsigned int length) {
   for (int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
+ 
+  Serial.print("Mensaje recibido bajo el tópico: ");
+  Serial.print(topic);
+  Serial.print(". Mensaje: ");
+  Serial.println(message);
 
-  if (String(topic) == mqtt_topic && message == "Alarma activada") {
-    timbreDFPlayer.play(1);
-    miBot.sendMessage(CHAT_ID, "Doorbell ringing...");
+  if (String(topic) == "alarma/detector") {
+    if (message == "Alarma activada") {
+      timbreDFPlayer.play(1);
+      miBot.sendMessage(-4116655447, "Timbre sonant...");
+      Serial.println("Alarma activada");
+    }
   }
 }
 
@@ -91,47 +117,55 @@ void loop() {
   // Send status message every 2 hours
   unsigned long currentTime = millis();
   if (currentTime - lastMsgTime > twoHours) {
-    miBot.sendMessage(CHAT_ID, "System status: OK");
+    miBot.sendMessage(-4116655447, "Estado correcto...");
     lastMsgTime = currentTime;
   }
 
   // Handle Telegram commands
-  TBMessage msg;
-  if (CTBotMessageText == miBot.getNewMessage(msg)) {
-    String compareMsg(msg.text);
-    compareMsg.toLowerCase();
-   
-    char char_array[compareMsg.length() + 1];
-    strcpy(char_array, compareMsg.c_str());
-   
-    if (StrContains("+", char_array)) {
-      miBot.sendMessage(msg.sender.id, "Increasing volume");
-      timbreDFPlayer.volumeUp();
-      delay(500);
-      timbreDFPlayer.volumeUp();
+  static unsigned long lastTelegramCheck = 0;
+  if (currentTime - lastTelegramCheck >= 25000) {
+    TBMessage msg;
+    if (CTBotMessageText == miBot.getNewMessage(msg)) {
+      Serial.println(msg.text);
+      String compareMsg(msg.text);
+      compareMsg.toLowerCase();
+      int n = compareMsg.length();
+      char char_array[n + 1];
+      strcpy(char_array, compareMsg.c_str());
+      
+      if (StrContains("+", char_array)) {
+        Serial.println("SUBIR VOLUMEN");
+        miBot.sendMessage(msg.sender.id, "SUBIENDO VOLUMEN");
+        timbreDFPlayer.volumeUp();
+        delay(500);  // Para evitar múltiples incrementos en un solo comando
+        timbreDFPlayer.volumeUp();
+      }
+      if (StrContains("-", char_array)) {
+        Serial.println("BAJAR VOLUMEN");
+        miBot.sendMessage(msg.sender.id, "BAJANDO VOLUMEN");
+        timbreDFPlayer.volumeDown();
+        delay(500);  // Del mismo modo, breve pausa
+        timbreDFPlayer.volumeDown();
+      }
+      if (StrContains("timbre", char_array)) {
+        timbreDFPlayer.play(1);
+        miBot.sendMessage(msg.sender.id, "Timbre sonando...");
+      }
+      if (StrContains("ip", char_array)) {
+        miBot.sendMessage(msg.sender.id, "IP: " + WiFi.localIP().toString(), "");
+      }
     }
-    if (StrContains("-", char_array)) {
-      miBot.sendMessage(msg.sender.id, "Decreasing volume");
-      timbreDFPlayer.volumeDown();
-      delay(500);
-      timbreDFPlayer.volumeDown();
-    }
-    if (StrContains("timbre", char_array)) {
-      timbreDFPlayer.play(1);
-      miBot.sendMessage(msg.sender.id, "Playing doorbell sound...");
-    }
-    if (StrContains("ip", char_array)) {
-      miBot.sendMessage(msg.sender.id, "IP: " + WiFi.localIP().toString());
-    }
+    lastTelegramCheck = currentTime;
   }
-  delay(25000);
 }
 
 // WiFi connection with timeout
 bool connectWiFi() {
+  Serial.print("Conectando a WiFi...");
   WiFi.begin(ssid, password);
   unsigned long startAttemptTime = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
+    Serial.print(".");
     delay(500);
   }
   return WiFi.status() == WL_CONNECTED;
@@ -149,39 +183,63 @@ bool testTCPConnection() {
 
 // Initialize DFPlayer with retry mechanism
 void initializeDFPlayer() {
-  int attempts = 0;
-  bool initialized = false;
-  while (attempts < 10 && !initialized) {
+  int intentos = 0;
+  bool inicializado = false;
+  int max_intentos = 10;
+  while (intentos < max_intentos && !inicializado) {
+    client.publish("esp/status", "Intentando conexión DFPlayer...");
     digitalWrite(LED_BUILTIN, LOW);
     delay(5000);
     digitalWrite(LED_BUILTIN, HIGH);
     if (timbreDFPlayer.begin(timbreSoftwareSerial)) {
-      // Set initial volume
-      for(int i=0; i<4; i++) {
-        timbreDFPlayer.volumeDown();
-        delay(500);
-      }
+      Serial.println("DFPlayer inicializado correctamente");
+      client.publish("esp/status", "DFPlayer conectado correctamente");
+      delay(500);
+      timbreDFPlayer.volumeDown();
+      delay(500);
+      timbreDFPlayer.volumeDown();
+      delay(500);
+      timbreDFPlayer.volumeDown();
+      delay(500);
+      timbreDFPlayer.volumeDown();
+      delay(500);
+      Serial.println("Reproduciendo el primer MP3...");
+      client.publish("esp/status", "Reproduciendo el primer MP3..."); 
       timbreDFPlayer.play(1);
-      initialized = true;
+      inicializado = true;
     } else {
-      attempts++;
+      Serial.println("Error en la inicialización del DFPlayer");
+      Serial.println("Reintentando....");
+      client.publish("esp/status", "Error al inicializar DFPlayer, reintentando...");
+      intentos++;
       delay(3000);
     }
+  }
+  if (!inicializado) {
+    Serial.println("No se pudo inicializar el DFPlayer después de varios intentos");
+    client.publish("esp/status", "DFPlayer fallo al inicializarse");
   }
 }
 
 // Setup Telegram bot with retry mechanism
 void setupTelegramBot() {
   miBot.setTelegramToken(token);
-  bool connected = false;
-  int attempts = 0;
-  while (!connected && attempts < 10) {
+  bool conectado = false;
+  int intentos = 0;
+  const int maxIntentos = 10;
+  while (!conectado && intentos < maxIntentos) {
     if (miBot.testConnection()) {
-      connected = true;
+      Serial.println("\nConectado a Telegram");
+      client.publish("esp/status", "Conectado a Telegram..."); 
+      conectado = true;
     } else {
-      attempts++;
+      intentos++;
+      Serial.println("\nFallo al conectar con Telegram, reintentando...");
       delay(3000);
     }
+  }
+  if (!conectado) {
+    Serial.println("\nNo se pudo conectar con Telegram después de varios intentos");
   }
 }
 
@@ -189,7 +247,7 @@ void setupTelegramBot() {
 void setupMQTT() {
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
-  client.setKeepAlive(3600);
+  client.setKeepAlive(10);
   reconnect();
 }
 
@@ -197,14 +255,17 @@ void setupMQTT() {
 bool StrContains(const char *str, const char *sfind) {
   char found = 0;
   char index = 0;
-  char len = strlen(str);
-  
-  if (strlen(sfind) > len) return false;
-  
+  char len;
+  len = strlen(str);
+  if (strlen(sfind) > len) {
+    return false;
+  }
   while (index < len) {
     if (str[index] == sfind[found]) {
       found++;
-      if (strlen(sfind) == found) return true;
+      if (strlen(sfind) == found) {
+        return true;
+      }
     } else {
       found = 0;
     }
