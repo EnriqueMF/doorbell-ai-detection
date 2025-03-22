@@ -4,11 +4,13 @@ This project implements a smart doorbell system using an ESP8266 microcontroller
 
 ## Features
 
-- **Doorbell Functionality**: Plays audio files when triggered
+- **Doorbell Functionality**: Plays audio files (e.g., "001.mp3") when triggered
 - **Telegram Integration**: Receive notifications and control the doorbell remotely
-- **MQTT Integration**: Core communication system for doorbell detection events
+- **MQTT Integration**: Core communication system for detection events and status updates
 - **Remote Control**: Adjust volume and trigger the doorbell via Telegram commands
-- **Status Updates**: Sends periodic status updates to ensure system is operational
+- **Status Updates**: Sends periodic status updates every 2 hours to confirm system operation
+- **Connectivity Verification**: Tests MQTT broker connectivity using Pinger library before establishing connection
+- **Extended Keepalive**: Configured with 60-second keepalive interval to minimize disconnections
 
 ## Hardware Requirements
 
@@ -26,9 +28,10 @@ This project implements a smart doorbell system using an ESP8266 microcontroller
 - **ESP8266WiFi**: Built-in library for WiFi connectivity
 - **PubSubClient** (>=2.8.0): For MQTT communication
 - **CTBot** (>=2.1.9): For Telegram bot functionality
-- **ArduinoJson** (6.19.4): For JSON parsing (IMPORTANT: Use version 6.19.4, newer versions may have compatibility issues)
+- **ArduinoJson** (6.19.4): For JSON parsing (IMPORTANT: Use version 6.19.4, newer versions may have compatibility issues with CTBot)
 - **DFRobotDFPlayerMini** (>=1.0.5): For MP3 player control
 - **SoftwareSerial**: Built-in library for serial communication with DFPlayer
+- **Pinger**: For MQTT broker connectivity verification
 
 ### Arduino IDE Setup
 
@@ -68,6 +71,10 @@ The MQTT broker is **ESSENTIAL** for the system to function. You have several op
   listener 1883
   password_file /etc/mosquitto/passwd
   allow_anonymous false
+  ```
+- **Important**: Open port 1883 in VPS firewall (e.g., using UFW):
+  ```bash
+  sudo ufw allow 1883/tcp
   ```
 - Restart Mosquitto:
   ```bash
@@ -118,16 +125,17 @@ mosquitto_pub -h [broker-address] -p 1883 -u [username] -P [password] -t test -m
 
 1. **MQTT Server Setup** (REQUIRED):
    - Ensure your MQTT broker is running and accessible
-   - Note down the broker's IP address/hostname
+   - Open port 1883 in VPS firewall (if using VPS)
    - Create credentials for the doorbell system
    - Test the broker connection:
      ```bash
      # Install mosquitto clients
      sudo apt install mosquitto-clients
      
-     # Test connection
-     mosquitto_sub -h [broker-address] -p 1883 -u [username] -P [password] -t "test/#"
+     # Test connection and verify status messages
+     mosquitto_sub -h [broker-address] -t "esp/status" -u [username] -P [password]
      ```
+   - You should see "ESP connected successfully" when the ESP8266 connects
 
 2. **Prepare the SD Card**:
    - Format the SD card as FAT32
@@ -157,10 +165,12 @@ mosquitto_pub -h [broker-address] -p 1883 -u [username] -P [password] -t test -m
 ### MQTT Integration (Core Functionality)
 
 The MQTT integration is the core communication system:
-- System subscribes to topic defined in `MQTT_TOPIC`
+- System subscribes to topic "alarma/detector"
 - Receives doorbell detection events from the Orange Pi
 - Triggers the doorbell sound when "Alarma activada" message is received
-- Sends status updates back to the broker
+- Publishes status messages to "esp/status" topic
+- Implements extended keepalive (60 seconds) for connection stability
+- Verifies broker connectivity before establishing connection
 
 ### Telegram Commands
 
@@ -172,19 +182,38 @@ The MQTT integration is the core communication system:
 ## Troubleshooting
 
 ### MQTT Connection Issues (Critical)
-1. Verify MQTT broker is running:
+
+1. **Verify MQTT Broker Status**:
    ```bash
-   systemctl status mosquitto
+   sudo systemctl status mosquitto
    ```
-2. Check broker connectivity:
+
+2. **Check Firewall Configuration**:
    ```bash
-   mosquitto_pub -h [broker] -p 1883 -u [username] -P [password] -t test -m "test"
+   sudo ufw status
+   # If port 1883 is not open:
+   sudo ufw allow 1883/tcp
    ```
-3. Verify credentials in `config.h`
-4. Check network connectivity and firewall rules
-5. Monitor MQTT logs:
+
+3. **Test MQTT Connectivity**:
    ```bash
-   tail -f /var/log/mosquitto/mosquitto.log
+   # Subscribe to status messages
+   mosquitto_sub -h [broker-address] -t "esp/status" -u [username] -P [password]
+   ```
+
+4. **Network Connectivity**:
+   - Verify broker is reachable:
+     ```bash
+     ping [broker-address]
+     telnet [broker-address] 1883
+     ```
+   - Check firewall rules allow MQTT traffic
+   - Verify DNS resolution if using hostname
+
+5. **Monitor MQTT Traffic**:
+   ```bash
+   # Subscribe to all topics (useful for debugging)
+   mosquitto_sub -h [broker-address] -t "#" -v -u [username] -P [password]
    ```
 
 ### Other Issues
@@ -194,9 +223,11 @@ The MQTT integration is the core communication system:
 
 ## Notes
 
-- The system sends a status message every 2 hours to confirm it's operational
-- ArduinoJson version 6.20.0 has compatibility issues; use version 6.19.4 or earlier
-- The default volume is set to a moderate level; adjust as needed using Telegram commands
+- The system sends a status message every 2 hours to confirm operation
+- ArduinoJson version 6.19.4 is required (newer versions may have compatibility issues with CTBot)
+- Extended keepalive interval (60 seconds) helps maintain stable MQTT connection
+- Broker connectivity is verified using Pinger library before establishing connection
+- Default volume is set to a moderate level; adjust using Telegram commands
 
 ## License
 
